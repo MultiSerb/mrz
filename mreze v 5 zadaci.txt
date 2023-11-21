@@ -1,0 +1,778 @@
+zad 1 
+klijent
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define WIN32_LEAN_AND_MEAN
+
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "conio.h"
+
+#pragma comment (lib, "Ws2_32.lib")
+#pragma comment (lib, "Mswsock.lib")
+#pragma comment (lib, "AdvApi32.lib")
+
+#define SERVER_IP_ADDRESS "127.0.0.1"		// IPv4 address of server
+#define BUFFER_SIZE 512						// Size of buffer that will be used for sending and receiving messages to client
+
+
+int main()
+{
+    // Server address structure
+    sockaddr_in serverAddress;
+
+    // Size of server address structure
+	int sockAddrLen = sizeof(serverAddress);
+
+	// Buffer that will be used for sending and receiving messages to client
+    char dataBuffer[BUFFER_SIZE];
+
+	// WSADATA data structure that is used to receive details of the Windows Sockets implementation
+    WSADATA wsaData;//////////////////////////////////////////////////wsdata p1 s12
+    
+	// Initialize windows sockets for this process
+	int iResult = WSAStartup(MAKEWORD(2,2), &wsaData);
+    
+	// Check if library is succesfully initialized
+	if (iResult != 0)
+    {
+        printf("WSAStartup failed with error: %d\n", iResult);
+        return 1;
+    }
+//////////////////////////////////////////////////////////////////////
+
+   // memorija
+    memset((char*)&serverAddress, 0, sizeof(serverAddress));		//p1 s20
+    
+	// Read server's port number
+	printf("Enter server port number (15011 or 15012):\n");///zadatak je takav 2 porta
+    gets_s(dataBuffer, BUFFER_SIZE);//uzima string p1 s26
+	unsigned long serverPort = atoi(dataBuffer);//server port smestamo broj iz data bafera al smo morali konverziju
+
+	 // Initialize address structure of server//////////////////////////////////////////////////////////////////p1 s20
+	serverAddress.sin_family = AF_INET;								// IPv4 address famly
+    serverAddress.sin_addr.s_addr = inet_addr(SERVER_IP_ADDRESS);	// mora da se stavi samo adresa ko p1 s18
+    serverAddress.sin_port = htons(serverPort);					// Set server port
+
+	// Create a socket
+    SOCKET clientSocket = socket(AF_INET,      // IPv4 address famly
+								 SOCK_DGRAM,   // Datagram socket
+								 IPPROTO_UDP); // UDP protocol samo menjamo protokol koj treba kad
+
+	// Check if socket creation succeeded
+    if (clientSocket == INVALID_SOCKET)// ako izbije eror p3 s6 ima primer samo sa accapt
+    {
+        printf("Creating socket failed with error: %d\n", WSAGetLastError());
+        WSACleanup();
+        return 1;
+    }
+
+   while (true)//zadatak
+   {
+	
+		printf("Enter message to send:\n");
+
+		// Read string from user into outgoing buffer
+    	gets_s(dataBuffer, BUFFER_SIZE);
+
+		//close client if end  message is entered
+    	if ( !strcmp(dataBuffer,"end"))
+    	{
+       	 printf("Client has finished. It's closing.\n");
+	    	 break;
+    	}
+	
+		// Send message to server////////////////////////////////prez 2 str 4
+   	 iResult = sendto(clientSocket,						// Own socket
+					 dataBuffer,						// Text of message
+					 strlen(dataBuffer),				// Message size
+					 0,									// No flags
+					 (SOCKADDR *)&serverAddress,		// Address structure of server (type, IP address and port)
+					 sizeof(serverAddress));			// Size of sockadr_in structure
+
+		// Check if message is succesfully sent. If not, close client application
+		if (iResult == SOCKET_ERROR)
+    	{
+        printf("sendto failed with error: %d\n", WSAGetLastError());
+        closesocket(clientSocket);
+        WSACleanup();
+        return 1;
+    	}
+
+   }
+
+	// Only for demonstration purpose
+	printf("Press any key to exit: ");
+	_getch();
+ 
+	// Close client application 2 rez 6 strana
+    iResult = closesocket(clientSocket);
+    if (iResult == SOCKET_ERROR)
+    {
+        printf("closesocket failed with error: %d\n", WSAGetLastError());
+		WSACleanup();
+        return 1;
+    }
+
+	// Close Winsock library
+    WSACleanup();
+
+	// Client has succesfully sent a message
+    return 0;
+}
+srver
+
+// UDP server that use non-blocking sockets
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define WIN32_LEAN_AND_MEAN
+
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "conio.h"
+
+#pragma comment (lib, "Ws2_32.lib")
+#pragma comment (lib, "Mswsock.lib")
+#pragma comment (lib, "AdvApi32.lib")
+
+//Portovi servera
+#define SERVER_PORT1 15011	
+#define SERVER_PORT2 15012
+
+
+#define BUFFER_SIZE 512	//bafervelicina	
+
+int main()
+{
+	// server adrese
+	sockaddr_in serverAddress1;
+	sockaddr_in serverAddress2;
+
+	// bafer preko koga saljemo i primamo
+	char dataBuffer[BUFFER_SIZE];
+
+	// wsadata ono sa prvih vezbi to ima************************Prez 1 str 12
+	WSADATA wsaData;
+
+	// Initialize windows sockets library for this process
+	if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0)
+	{
+		printf("WSAStartup failed with error: %d\n", WSAGetLastError());
+		return 1;
+	}
+//*****************************************************************ovo ispod prez 1 str 20//prez 3 str 4 
+	// Initialize serverAddress1 and serverAddress2 structures used by bind function
+	memset((char*)&serverAddress1, 0, sizeof(serverAddress1));
+	serverAddress1.sin_family = AF_INET; 			// set server address protocol family
+	serverAddress1.sin_addr.s_addr = INADDR_ANY;	// use all available addresses of server
+	serverAddress1.sin_port = htons(SERVER_PORT1);	// 15001 port
+
+	memset((char*)&serverAddress2, 0, sizeof(serverAddress2));
+	serverAddress2.sin_family = AF_INET; 							// set server address protocol family
+	serverAddress2.sin_addr.s_addr = inet_addr("127.0.0.1");		// loop address
+	serverAddress2.sin_port = htons(SERVER_PORT2);					// 15002 port
+//************************************************************************************************************************prez 3 4 str samo pomenis u UDP ili TCP sta ti treba
+	// Create first socket
+	SOCKET serverSocket1 = socket(AF_INET,      // IPv4 address famly
+		SOCK_DGRAM,   // datagram socket
+		IPPROTO_UDP); // UDP
+
+//*****************************************************************************************************************************
+	// Check if socket creation succeeded
+	if (serverSocket1 == INVALID_SOCKET)
+	{
+		printf("Creating socket failed with error: %d\n", WSAGetLastError());
+		WSACleanup();
+		return 1;
+	}
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ovo iznad nema
+	// Create second socket
+	SOCKET serverSocket2 = socket(AF_INET,      // IPv4 address famly
+		SOCK_DGRAM,   // datagram socket
+		IPPROTO_UDP); // UDP
+
+	// Check if socket creation succeeded
+	if (serverSocket2 == INVALID_SOCKET)
+	{
+		printf("Creating socket failed with error: %d\n", WSAGetLastError());
+		WSACleanup();
+		return 1;
+	}
+//////////////////////////////////////////////////////////////////////////////////////////////ovo gore se ponavlja jer 2 soketa
+	// Bind server address structure (type, port number and local address) to first socket
+	int iResult = bind(serverSocket1,(SOCKADDR *)&serverAddress1, sizeof(serverAddress1));
+
+	// Check if socket is succesfully binded to server address data
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("Socket bind failed with error: %d\n", WSAGetLastError());
+		closesocket(serverSocket1);
+		WSACleanup();
+		return 1;
+	}
+/////////////////////////////////////////////////////////////////////////////////////////prez 3 str 5
+	// Bind server address structure (type, port number and local address) to second socket
+	iResult = bind(serverSocket2,(SOCKADDR *)&serverAddress2, sizeof(serverAddress2));
+
+	// Check if socket is succesfully binded to server address data
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("Socket bind failed with error: %d\n", WSAGetLastError());
+		closesocket(serverSocket2);
+		WSACleanup();
+		return 1;
+	}
+//////////////////////////////////////////////////////////////////////////////////////////////////////ponovljeno
+	// Setting non-blocking mode to both sockets
+	unsigned long mode = 1;
+	if(ioctlsocket(serverSocket1, FIONBIO, &mode) != 0 || ioctlsocket(serverSocket2, FIONBIO, &mode) != 0)
+	{
+		printf("ioctlsocket failed with error %d\n", WSAGetLastError());
+		closesocket(serverSocket1);
+		closesocket(serverSocket2);
+		WSACleanup();
+		return 1;
+	}
+//////////////////////////////////////////////////////////////////////////////////////////4 prez 3 str
+	printf("Simple UDP server started and waiting client messages.\n");
+
+	// Ovo je randja
+	while (true)
+	{
+		// Declare and initialize client address that will be set from recvfrom
+		sockaddr_in clientAddress;
+		memset(&clientAddress, 0, sizeof(clientAddress));
+
+		// Set whole buffer to zero
+		memset(dataBuffer, 0, BUFFER_SIZE);///////////////////////////stavlja na 0 i bafer i c ardersu
+
+		// Size of client address
+		int sockAddrLen = sizeof(clientAddress);
+
+		// Declare and initialize set of socket descriptor for buffer reading 5 prez  4 str   2korak
+		fd_set readfds;
+		FD_ZERO(&readfds);
+
+		// Add socket to set readfds   3 korak
+		FD_SET(serverSocket1, &readfds);
+		FD_SET(serverSocket2, &readfds);
+
+		// Declare and initialize set of socket descriptor for exceptions opet korak 2 
+		fd_set exceptfds;
+		FD_ZERO(&exceptfds);
+
+		// Add socket to set exceptfds korak 3
+		FD_SET(serverSocket1, &exceptfds);
+		FD_SET(serverSocket2, &exceptfds);
+
+		// Wait new messages to arrive in one of the sockets in readfds set and wait for possible exception on sockets in exceptfds set
+		int sResult = select(0, &readfds , NULL , &exceptfds , NULL);//korak 4 ali drugi deo
+
+		// Check whether the error occurred
+		if (sResult == SOCKET_ERROR)//5 korak 2 od 3 dela XD
+		{
+			printf("select failed with error: %d\n", WSAGetLastError());
+			break;
+		}
+
+		// If result is positive, that is indicator that packet has arrived to one or more socket or there is exception on some socket
+		// Result number corresonds to number of sockets that have an event
+		else if (sResult > 0)
+		{
+			unsigned long portNumber = 0;
+
+			// We will check if packet is arrived to one of our sockets (if two or more sockets are used, we have to check each socket)
+			if(FD_ISSET(serverSocket1, &readfds))///////////////////////////////////////////////////////////////////////////////////////////////6 korak
+			{
+				// Receive client message///////////////////////////////////////////////////////////////////////////////////////
+				iResult = recvfrom(serverSocket1,			// Socket with port 15001
+					dataBuffer,					// Buffer that will be used for receiving message
+					BUFFER_SIZE,					// Maximal size of buffer
+					0,							// No flags
+					(SOCKADDR *)&clientAddress,	// Client information from received message (ip address and port)
+					&sockAddrLen);				// Size of sockadd_in structure
+				portNumber = SERVER_PORT1;
+				if(iResult != SOCKET_ERROR)
+				{
+					// Set end of string
+					dataBuffer[iResult] = '\0';
+
+
+					printf("Server received message on %d port. Client sent: %s.\n", portNumber,dataBuffer);
+				}
+				else
+				{
+					printf("recvfrom failed with error: %d\n", WSAGetLastError());
+					continue;
+				}
+			}////////////////////////////////////////////////////////////////////////////////////////////2 prez 5 str od irezultata do close the socket komentara
+			if(FD_ISSET(serverSocket2, &readfds))
+			{
+				// Receive client message
+				iResult = recvfrom(serverSocket2,			// Socket with port 15002
+					dataBuffer,					// Buffer that will be used for receiving message
+					BUFFER_SIZE,					// Maximal size of buffer
+					0,							// No flags
+					(SOCKADDR *)&clientAddress,	// Client information from received message (ip address and port)
+					&sockAddrLen);				// Size of sockadd_in structure
+				portNumber = SERVER_PORT2;
+				if(iResult != SOCKET_ERROR)
+				{
+					// Set end of string
+					dataBuffer[iResult] = '\0';
+
+
+					printf("Server received message on %d port. Client sent: %s.\n", portNumber,dataBuffer);
+				}
+				else
+				{
+					printf("recvfrom failed with error: %d\n", WSAGetLastError());
+					continue;
+				}
+			}/////////////////////////////////////////////////////////////////////////////////////////////////ponovljeno
+			// We will check if an exception occurred on one of our sockets. Close server application if error occured
+			if(FD_ISSET(serverSocket1, &exceptfds))////////////////////////////////////////////////////////////6 korak al sa expetesnom
+			{
+				break;
+			}
+			if(FD_ISSET(serverSocket2, &exceptfds))
+			{
+				break;
+			}
+			// neither of two socket is in these two sets (some error has occurred)
+			else
+			{
+				continue;
+			}
+
+			// Check if message is succesfully received
+
+		}
+	}
+
+	// Close server application//////////////////////////////////////////2 prez 6 strana close samo sto proveravamo za oba dal je eror
+	if (SOCKET_ERROR == closesocket(serverSocket1) || SOCKET_ERROR == closesocket(serverSocket2))
+	{
+		printf("closesocket failed with error: %ld\n", WSAGetLastError());
+		WSACleanup();//wsapclean zatvoris
+		return 1;
+	}
+
+	printf("Server successfully shut down.\n");
+
+	////////////////////////////////////////////////////////// zatvoris ga
+	WSACleanup();
+	return 0;
+}
+
+zad 2
+klijent
+#define WIN32_LEAN_AND_MEAN
+
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "conio.h"
+
+#pragma comment (lib, "Ws2_32.lib")
+#pragma comment (lib, "Mswsock.lib")
+#pragma comment (lib, "AdvApi32.lib")
+
+#pragma pack(1)
+
+#define SERVER_IP_ADDRESS "127.0.0.1"
+#define SERVER_PORT 27016
+#define BUFFER_SIZE 256
+
+
+struct studentInfo{
+	char ime [15];
+	char prezime [20];
+	short poeni;
+};
+
+// TCP client that use non-blocking sockets
+int main() 
+{
+    // Socket used to communicate with server
+    SOCKET connectSocket = INVALID_SOCKET;
+
+    // Variable used to store function return value
+    int iResult;
+
+    // Buffer we will use to store message
+    char dataBuffer[BUFFER_SIZE];
+
+	// WSADATA data structure that is to receive details of the Windows Sockets implementation
+     WSADATA wsaData;
+
+	// Initialize windows sockets library for this process
+    if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0)
+    {
+        printf("WSAStartup failed with error: %d\n", WSAGetLastError());
+        return 1;
+    }
+
+    // create a socket
+    connectSocket = socket(AF_INET,
+                           SOCK_STREAM,
+                           IPPROTO_TCP);
+
+    if (connectSocket == INVALID_SOCKET)
+    {
+        printf("socket failed with error: %ld\n", WSAGetLastError());
+        WSACleanup();
+        return 1;
+    }
+
+    // Create and initialize address structure
+    sockaddr_in serverAddress;
+    serverAddress.sin_family = AF_INET;								// IPv4 protocol
+	serverAddress.sin_addr.s_addr = inet_addr(SERVER_IP_ADDRESS);	// ip address of server
+    serverAddress.sin_port = htons(SERVER_PORT);					// server port
+
+    // Connect to server specified in serverAddress and socket connectSocket
+	iResult = connect(connectSocket, (SOCKADDR*)&serverAddress, sizeof(serverAddress));
+    if (iResult == SOCKET_ERROR)
+    {
+        printf("Unable to connect to server.\n");
+        closesocket(connectSocket);
+        WSACleanup();
+		return 1;
+    }
+        
+        //promenljiva tipa studentInfo cija ce se polja popunuti i cela struktira poslati u okviru jedne poruke
+        studentInfo student;  
+	short poeni;
+ 
+	while(true)
+	{
+		// Unos potrebnih podataka koji ce se poslati serveru
+		printf("Unesite ime studenta: ");
+		gets_s(student.ime, 15);
+
+		printf("Unesite prezime studenta: ");
+		gets_s(student.prezime, 20);
+
+		printf("Unesite osvojene poene na testu: ");
+		scanf("%d", &poeni);
+		student.poeni=htons(poeni);  //obavezna funkcija htons() jer cemo slati podatak tipa short 
+		getchar();    //pokupiti enter karakter iz bafera tastature
+
+
+		// Slanje pripremljene poruke zapisane unutar strukture studentInfo
+		//prosledjujemo adresu promenljive student u memoriji, jer se na toj adresi nalaze podaci koje saljemo
+		//kao i velicinu te strukture (jer je to duzina poruke u bajtima)
+		iResult = send( connectSocket, (char*) &student, (int)sizeof(studentInfo), 0 );
+
+		// Check result of send function
+		if (iResult == SOCKET_ERROR)
+		{
+			printf("send failed with error: %d\n", WSAGetLastError());
+			closesocket(connectSocket);
+			WSACleanup();
+			return 1;
+		}
+
+		printf("Message successfully sent. Total bytes: %ld\n", iResult);
+
+		printf("\nPress 'x' to exit or any other key to continue: ");
+		if(getch() == 'x')
+			break;
+	}
+
+	// Shutdown the connection since we're done
+	iResult = shutdown(connectSocket, SD_BOTH);
+
+	// Check if connection is succesfully shut down.
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("Shutdown failed with error: %d\n", WSAGetLastError());
+		closesocket(connectSocket);
+		WSACleanup();
+		return 1;
+	}
+
+	Sleep(1000);
+
+    // Close connected socket
+    closesocket(connectSocket);
+
+	// Deinitialize WSA library
+    WSACleanup();
+
+    return 0;
+}
+
+server
+#define WIN32_LEAN_AND_MEAN
+
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "conio.h"
+
+#pragma comment (lib, "Ws2_32.lib")
+#pragma comment (lib, "Mswsock.lib")
+#pragma comment (lib, "AdvApi32.lib")
+
+#pragma pack(1)
+
+#define SERVER_PORT 27016
+#define BUFFER_SIZE 256
+#define MAX_CLIENTS 3
+
+
+struct studentInfo{//struktura ripcina
+	char ime [15];
+	char prezime [20];
+	short poeni;
+};
+
+// TCP server that use non-blocking sockets
+int main() 
+{
+	// Socket used for listening for new clients 
+	SOCKET listenSocket = INVALID_SOCKET;
+
+	// Sockets used for communication with client
+	SOCKET clientSockets[MAX_CLIENTS];
+	short lastIndex = 0;
+
+	// Variable used to store function return value
+	int iResult;
+
+	// Buffer used for storing incoming data
+	char dataBuffer[BUFFER_SIZE];
+
+	// WSADATA data structure that is to receive details of the Windows Sockets implementation
+	WSADATA wsaData;
+
+	// Initialize windows sockets library for this process
+	if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0)
+	{
+		printf("WSAStartup failed with error: %d\n", WSAGetLastError());
+		return 1;
+	}
+
+	// Initialize serverAddress structure used by bind
+	sockaddr_in serverAddress;
+	memset((char*)&serverAddress,0,sizeof(serverAddress));
+	serverAddress.sin_family = AF_INET;				// IPv4 address family
+	serverAddress.sin_addr.s_addr = INADDR_ANY;		// Use all available addresses
+	serverAddress.sin_port = htons(SERVER_PORT);	// Use specific port
+
+	//initialise all client_socket[] to 0 so not checked
+	memset(clientSockets, 0, MAX_CLIENTS * sizeof(SOCKET));
+
+	// Create a SOCKET for connecting to server
+	listenSocket = socket(AF_INET,      // IPv4 address family
+		SOCK_STREAM,  // Stream socket
+		IPPROTO_TCP); // TCP protocol
+
+	// Check if socket is successfully created
+	if (listenSocket == INVALID_SOCKET)
+	{
+		printf("socket failed with error: %ld\n", WSAGetLastError());
+		WSACleanup();
+		return 1;
+	}
+
+	// Setup the TCP listening socket - bind port number and local address to socket
+	iResult = bind(listenSocket,(struct sockaddr*) &serverAddress,sizeof(serverAddress));
+
+	// Check if socket is successfully binded to address and port from sockaddr_in structure
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("bind failed with error: %d\n", WSAGetLastError());
+		closesocket(listenSocket);
+		WSACleanup();
+		return 1;
+	}
+
+	//// All connections are by default accepted by protocol stek if socket is in listening mode.
+	//// With SO_CONDITIONAL_ACCEPT parameter set to true, connections will not be accepted by default
+	bool bOptVal = true;
+	int bOptLen = sizeof (bool);
+	iResult = setsockopt(listenSocket, SOL_SOCKET, SO_CONDITIONAL_ACCEPT, (char *) &bOptVal, bOptLen);
+	   if (iResult == SOCKET_ERROR) {
+	       printf("setsockopt for SO_CONDITIONAL_ACCEPT failed with error: %u\n", WSAGetLastError());
+	}
+
+	unsigned long  mode = 1;
+	if (ioctlsocket(listenSocket, FIONBIO, &mode) != 0)
+		printf("ioctlsocket failed with error.");
+
+	// Set listenSocket in listening mode
+	iResult = listen(listenSocket, SOMAXCONN);
+	if (iResult == SOCKET_ERROR)
+	{
+		printf("listen failed with error: %d\n", WSAGetLastError());
+		closesocket(listenSocket);
+		WSACleanup();
+		return 1;
+	}
+
+	printf("Server socket is set to listening mode. Waiting for new connection requests.\n");
+
+	// set of socket descriptors
+	fd_set readfds;
+
+	// timeout for select function
+	timeval timeVal;
+	timeVal.tv_sec = 1;
+	timeVal.tv_usec = 0;
+	
+	
+	studentInfo *student;
+
+	while(true)
+	{
+		// initialize socket set
+		FD_ZERO(&readfds);
+
+		// add server's socket and clients' sockets to set
+		if (lastIndex != MAX_CLIENTS)
+		{
+			FD_SET(listenSocket, &readfds);
+		}
+
+		for ( int i = 0 ; i < lastIndex ; i++) 
+		{
+			FD_SET(clientSockets[i], &readfds);
+		}
+
+		// wait for events on set
+		int selectResult = select( 0 , &readfds , NULL , NULL , &timeVal);
+
+		if (selectResult == SOCKET_ERROR)
+		{
+			printf("Select failed with error: %d\n", WSAGetLastError());
+			closesocket(listenSocket);
+			WSACleanup();
+			return 1;
+		}
+		else if(selectResult == 0) // timeout expired
+		{
+			if(_kbhit()) //check if some key is pressed
+			{
+				getch();
+				printf("Primena racunarskih mreza u infrstrukturnim sistemima 2019/2020\n");
+			}
+			continue;
+		}
+		else if (FD_ISSET(listenSocket, &readfds)) 
+		{
+			// Struct for information about connected client
+			sockaddr_in clientAddr;
+			int clientAddrSize = sizeof(struct sockaddr_in);
+
+			// New connection request is received. Add new socket in array on first free position.
+			clientSockets[lastIndex] = accept(listenSocket, (struct sockaddr *)&clientAddr, &clientAddrSize);
+
+			if (clientSockets[lastIndex] == INVALID_SOCKET)
+			{
+				if (WSAGetLastError() == WSAECONNRESET)
+				{
+					printf("accept failed, because timeout for client request has expired.\n");
+				}
+				else
+				{
+					printf("accept failed with error: %d\n", WSAGetLastError());
+				}
+			}
+			else
+			{
+				if (ioctlsocket(clientSockets[lastIndex], FIONBIO, &mode) != 0)
+				{
+					printf("ioctlsocket failed with error.");
+					continue;
+				}
+				lastIndex ++;
+				printf("New client request accepted (%d). Client address: %s : %d\n", lastIndex, inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
+
+			}
+		}
+		else
+		{
+
+			// Check if new message is received from connected clients
+			for (int i = 0; i < lastIndex ; i++) 
+			{
+				// Check if new message is received from client on position "i"
+				if (FD_ISSET(clientSockets[i], &readfds)) 
+				{
+					iResult = recv(clientSockets[i], dataBuffer, BUFFER_SIZE, 0);
+
+					if (iResult > 0)
+					{
+						dataBuffer[iResult] = '\0';
+						printf("Message received from client (%d):\n", i+1);
+						
+						//primljenoj poruci u memoriji pristupiti preko pokazivaca tipa (studentInfo *)
+						//jer znamo format u kom je poruka poslata a to je struct studentInfo
+						student=(studentInfo *)dataBuffer;
+
+						printf("Ime i prezime: %s %s  \n", student->ime, student->prezime);
+
+						printf("Poeni studenta: %d  \n", ntohs(student->poeni));
+						printf("_______________________________  \n");
+
+						
+					}
+					else if (iResult == 0)
+					{
+						// connection was closed gracefully
+						printf("Connection with client (%d) closed.\n", i+1);
+						closesocket(clientSockets[i]);
+
+						// sort array and clean last place
+						for (int j = i; j < lastIndex-1; j++) 
+						{
+							clientSockets[j] = clientSockets[j+1];
+						}
+						clientSockets[lastIndex-1] = 0;
+
+						lastIndex--;
+					}
+					else
+					{
+						// there was an error during recv
+						printf("recv failed with error: %d\n", WSAGetLastError());
+						closesocket(clientSockets[i]);
+
+						// sort array and clean last place
+						for (int j = i; j < lastIndex-1; j++) 
+						{
+							clientSockets[j] = clientSockets[j+1];
+						}
+						clientSockets[lastIndex-1] = 0;
+
+						lastIndex--;
+					}
+				}
+			}
+		}
+	}
+
+	//Close listen and accepted sockets
+	closesocket(listenSocket);
+
+	// Deinitialize WSA library
+	WSACleanup();
+
+	return 0;
+}
+
+
+
+
+
